@@ -7,6 +7,16 @@ import ray.rllib.agents.dqn as dqn
 import ray.rllib.agents.ppo as ppo
 import ray
 from ray.tune.logger import pretty_print
+import argparse as ap
+from ray.rllib.utils import try_import_tf
+
+try:
+    _, tf, version = try_import_tf(True)
+    assert version == 2, "TF not version 2.xx"
+except ImportError as e:
+    raise e
+
+assert tf.test.is_built_with_cuda(), "CUDA not available"
 
 
 def _state_converter(state):
@@ -71,6 +81,9 @@ class Env(gym.Env, ABC):
 
 if __name__ == '__main__':
 
+    arg_parser = ap.ArgumentParser(prog="TwoSidedQueueNetwork")
+    arg_parser.add_argument("--num_cpus", type=int, nargs=1, default=12)
+    arg_parser.add_argument("--num_gpus", type=int, nargs=1, default=1)
     # num_stations = 2
     # routing_matrix = generate_random_routing(num_stations)
 
@@ -102,5 +115,5 @@ if __name__ == '__main__':
         if (_ + 1) % 10 == 0:
             print(pretty_print(res))
         if (_ + 1) % 100 == 0:
-            print(f"Model saved at {trainer.save('./checkpts/')}")
+            print(f"Model saved at {trainer.save()}")
 
