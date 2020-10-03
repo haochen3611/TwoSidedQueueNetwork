@@ -108,15 +108,15 @@ python-blazarclient==3.1.1
 python-chi==0.3.0
 python-dateutil==2.8.1
 python-glanceclient==3.2.2
+python-heatclient==2.2.1
 python-keystoneclient==4.1.1
 python-neutronclient==7.2.1
 python-novaclient==17.2.1
+python-swiftclient==3.10.1
 pytz==2020.1
 PyYAML==5.3.1
 queueing-tool==1.2.4
 ray==1.0.0
-ray[tune]
-ray[rllib]
 redis==3.4.1
 requests==2.24.0
 requests-oauthlib==1.3.0
@@ -128,6 +128,7 @@ simplejson==3.17.2
 six==1.15.0
 soupsieve==2.0.1
 stevedore==3.2.2
+sumolib==1.6.0
 tabulate==0.8.7
 tensorboard==2.3.0
 tensorboard-plugin-wit==1.7.0
@@ -136,6 +137,7 @@ tensorflow==2.3.1
 tensorflow-estimator==2.3.0
 termcolor==1.1.0
 tqdm==4.49.0
+traci==1.6.0
 typing-extensions==3.7.4.3
 ujson==3.2.0
 urllib3==1.25.10
