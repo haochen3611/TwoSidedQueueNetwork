@@ -3,7 +3,6 @@ from abc import ABC
 from simpleSim import Sim
 import numpy as np
 import gym
-import ray.rllib.agents.dqn as dqn
 import ray.rllib.agents.ppo as ppo
 import ray
 from ray.tune.logger import pretty_print
@@ -19,11 +18,30 @@ except ImportError as e:
 assert tf.test.is_built_with_cuda(), "CUDA not available"
 
 
+__all__ = [
+    'PPOEnv',
+    'PPOENV_DEFAULT_CONFIG'
+]
+
+
+PPOENV_DEFAULT_CONFIG = {
+    "rout_mat": np.array([[0, 1], [1, 0]]),
+    "arr_rate": np.array([0.1, 0.1]),  # expected passenger arrival rate count/sec
+    "trip_time": np.array([[100, 500], [500, 100]]),  # expected trip time
+    "init_veh": np.array([100, 100]),
+    "seed": 1010,
+    "horizon": 1000,
+    "time_per_step": 10.,
+    "alpha": 1.,
+    "binary_state": True,
+}
+
+
 def _state_converter(state):
     return np.greater_equal(state, 0).astype(np.int8)
 
 
-class Env(gym.Env, ABC):
+class PPOEnv(gym.Env, ABC):
 
     def __init__(self, config: dict):
         self.trade_off_ratio = config.pop('alpha', 1.)
@@ -80,24 +98,17 @@ class Env(gym.Env, ABC):
 
 
 if __name__ == '__main__':
-
+    # TODO: build the CLI args
     arg_parser = ap.ArgumentParser(prog="TwoSidedQueueNetwork")
     arg_parser.add_argument("--num_cpus", type=int, nargs=1, default=12)
     arg_parser.add_argument("--num_gpus", type=int, nargs=1, default=1)
+    arg_parser.add_argument("--config", type=str)
+
+    cli_args = vars(arg_parser.parse_args())
+
     # num_stations = 2
     # routing_matrix = generate_random_routing(num_stations)
 
-    env_config = {
-        "rout_mat": np.array([[0, 1], [1, 0]]),
-        "arr_rate": np.array([0.1, 0.1]),  # expected passenger arrival rate count/sec
-        "trip_time": np.array([[100, 500], [500, 100]]),  # expected trip time
-        "init_veh": np.array([100, 100]),
-        "seed": 1010,
-        "horizon": 1000,
-        "time_per_step": 10.,
-        "alpha": 1.,
-        "binary_state": True,
-    }
     total_run = 1000
 
     ray.init()
@@ -105,8 +116,8 @@ if __name__ == '__main__':
     all_config['num_workers'] = 12
     all_config['num_gpus'] = 1
     all_config['vf_clip_param'] = 1000
-    all_config['env'] = Env
-    all_config['env_config'] = env_config
+    all_config['env'] = PPOEnv
+    all_config['env_config'] = PPOENV_DEFAULT_CONFIG
 
     trainer = ppo.PPOTrainer(config=all_config)
 
@@ -116,4 +127,3 @@ if __name__ == '__main__':
             print(pretty_print(res))
         if (_ + 1) % 100 == 0:
             print(f"Model saved at {trainer.save()}")
-
