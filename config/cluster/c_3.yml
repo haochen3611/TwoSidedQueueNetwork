@@ -15,6 +15,9 @@ heat_template_version: 2015-10-15
 # It does not have to be in the beginning or the end of the document.
 # Variables you can edit are defined here.
 parameters:
+    name_prefix:
+        type: string
+        description: Name prefix for all stack objects. Required.
     name_suffix:
         type: string
         description: Name suffix for all stack objects. Required.
@@ -72,10 +75,11 @@ resources:
         properties:
             name:
                 str_replace:
-                    template: network_name-suffix
+                    template: prefix-network_name-suffix
                     params:
+                        prefix: { get_param: name_prefix }
                         network_name: { get_param: private_network_name }
-                        suffix: { get_param: name_suffix}
+                        suffix: { get_param: name_suffix }
 
     private_subnet:
         type: OS::Neutron::Subnet
@@ -95,7 +99,12 @@ resources:
     router_to_ext:
         type: OS::Neutron::Router
         properties:
-            name: router
+            name:
+                str_replace:
+                    template: prefix-router-suffix
+                    params:
+                        prefix: { get_param: name_prefix }
+                        suffix: { get_param: name_suffix }
             external_gateway_info:
                 network: public
 
@@ -110,8 +119,9 @@ resources:
         properties:
             name:
                 str_replace:
-                    template: master-suffix
+                    template: prefix-master-suffix
                     params:
+                        prefix: {get_param: name_prefix}
                         suffix: {get_param: name_suffix}
             flavor: { get_param: flavor_name }
             image: { get_param: image_name }
@@ -152,8 +162,9 @@ resources:
                 properties:
                     name:
                         str_replace:
-                            template: slave-%index%-suffix
+                            template: prefix-slave-%index%-suffix
                             params:
+                                prefix: {get_param: name_prefix}
                                 suffix: {get_param: name_suffix}
                     flavor: { get_param: flavor_name }
                     image: { get_param: image_name }

@@ -1,6 +1,7 @@
+import json
 from abc import ABC
-
-from simpleSim import Sim
+import copy
+from simulator import SimpleSim
 import numpy as np
 import gym
 import ray.rllib.agents.ppo as ppo
@@ -15,14 +16,23 @@ try:
 except ImportError as e:
     raise e
 
-assert tf.test.is_built_with_cuda(), "CUDA not available"
+if not tf.test.is_built_with_cuda():
+    my_devices = tf.config.experimental.list_physical_devices(device_type='CPU')
+    tf.config.experimental.set_visible_devices(devices=my_devices, device_type='CPU')
 
 
 __all__ = [
     'PPOEnv',
-    'PPOENV_DEFAULT_CONFIG'
+    'PPOENV_DEFAULT_CONFIG',
+    'PPOExpRunner'
 ]
 
+NP_ARRAY_FIELDS = [
+    "rout_mat",
+    "arr_rate",
+    "trip_time",
+    "init_veh"
+]
 
 PPOENV_DEFAULT_CONFIG = {
     "rout_mat": np.array([[0, 1], [1, 0]]),
@@ -48,7 +58,7 @@ class PPOEnv(gym.Env, ABC):
         self.binary_state = config.pop('binary_state', True)
         self.max_pass_len = config.pop('max_pass_len', 1000)
         self.terminal_reward = config.pop('terminal_reward', -1000)
-        self.sim = Sim(**config)
+        self.sim = SimpleSim(**config)
         self.action_space = gym.spaces.MultiDiscrete([2, ] * (self.sim.num_nodes ** 2))
         self.observation_space = gym.spaces.Box(low=-np.sum(self.sim.init_veh),
                                                 high=np.infty,
@@ -97,33 +107,103 @@ class PPOEnv(gym.Env, ABC):
         return service_rate - self.trade_off_ratio * reb_cost
 
 
+def config_file_parser(file_name):
+    config_ = {}
+    try:
+        with open(file_name, 'r') as f:
+            config_ = json.load(f)
+
+    except FileNotFoundError:
+        env_config_ = copy.deepcopy(PPOENV_DEFAULT_CONFIG)
+
+    else:
+        env_config_ = config_.pop('env_config', None)
+        if env_config_ is not None:
+            for def_env_key in PPOENV_DEFAULT_CONFIG:
+                if def_env_key not in env_config_:
+                    env_config_[def_env_key] = PPOENV_DEFAULT_CONFIG[def_env_key]
+                else:
+                    if def_env_key in NP_ARRAY_FIELDS:
+                        env_config_[def_env_key] = np.array(env_config_[def_env_key])
+        else:
+            env_config_ = copy.deepcopy(PPOENV_DEFAULT_CONFIG)
+
+    config_['env_config'] = env_config_
+
+    return config_
+
+
+class PPOExpRunner:
+
+    def __init__(self, eager=False, checkpoint=None):
+
+        self._cli_args = None
+        self._all_config = None
+        self._iterations = None
+        self._trainer = None
+
+        if eager:
+            self.load_cli_args()
+            self.run(checkpoint=checkpoint)
+
+    @property
+    def trainer(self):
+        return self._trainer
+
+    @property
+    def policy(self):
+        return self._trainer.get_policy()
+
+    def load_cli_args(self):
+
+        arg_parser = ap.ArgumentParser(prog="TwoSidedQueueNetwork")
+        arg_parser.add_argument("--num_cpus", type=int, nargs='?', default=12)
+        arg_parser.add_argument("--num_gpus", type=int, nargs='?', default=1)
+        arg_parser.add_argument("--iter", type=int, nargs='?', default=1000)
+        arg_parser.add_argument("--config", type=str, nargs='?', default="")
+        arg_parser.add_argument("--debug", action="store_true", default=False)
+
+        self._cli_args = vars(arg_parser.parse_args())
+
+        self._iterations = self._cli_args['iter']
+        file_config = config_file_parser(self._cli_args['config'])
+
+        self._all_config = ppo.DEFAULT_CONFIG.copy()
+        self._all_config.update(file_config)
+
+        self._all_config['num_workers'] = int(self._cli_args ['num_cpus'])
+        self._all_config['num_gpus'] = int(self._cli_args ['num_gpus'])
+        self._all_config['vf_clip_param'] = 1000
+        self._all_config['env'] = PPOEnv
+        self._all_config['log_level'] = "ERROR"
+
+    def run(self, checkpoint=None):
+
+        if self._cli_args is None:
+            self.load_cli_args()
+
+        if not self._cli_args['debug']:
+            try:
+                print("Running in cluster!")
+                ray.init(address='auto')
+            except ConnectionError:
+                print("Running in single node!")
+                ray.init()
+        else:
+            ray.init(local_mode=True)
+
+        self._trainer = ppo.PPOTrainer(config=self._all_config)
+        if checkpoint is not None:
+            self._trainer.restore(checkpoint)
+
+        for _ in range(self._iterations):
+            res = self._trainer.train()
+            if (_ + 1) % 10 == 0:
+                print(pretty_print(res))
+            if (_ + 1) % 100 == 0:
+                print(f"Model saved at {self._trainer.save()}")
+
+
 if __name__ == '__main__':
-    # TODO: build the CLI args
-    arg_parser = ap.ArgumentParser(prog="TwoSidedQueueNetwork")
-    arg_parser.add_argument("--num_cpus", type=int, nargs=1, default=12)
-    arg_parser.add_argument("--num_gpus", type=int, nargs=1, default=1)
-    arg_parser.add_argument("--config", type=str)
 
-    cli_args = vars(arg_parser.parse_args())
-
-    # num_stations = 2
-    # routing_matrix = generate_random_routing(num_stations)
-
-    total_run = 1000
-
-    ray.init()
-    all_config = ppo.DEFAULT_CONFIG.copy()
-    all_config['num_workers'] = 12
-    all_config['num_gpus'] = 1
-    all_config['vf_clip_param'] = 1000
-    all_config['env'] = PPOEnv
-    all_config['env_config'] = PPOENV_DEFAULT_CONFIG
-
-    trainer = ppo.PPOTrainer(config=all_config)
-
-    for _ in range(total_run):
-        res = trainer.train()
-        if (_ + 1) % 10 == 0:
-            print(pretty_print(res))
-        if (_ + 1) % 100 == 0:
-            print(f"Model saved at {trainer.save()}")
+    runner = PPOExpRunner(eager=True)

@@ -5,7 +5,14 @@ import heapq
 import tqdm
 
 
-class Sim:
+__all__ = [
+    "SimpleSim",
+    "generate_random_routing",
+    "simple_policy",
+]
+
+
+class SimpleSim:
 
     def __init__(self,
                  rout_mat,
@@ -243,13 +250,13 @@ if __name__ == '__main__':
     seeds = [0]
 
     def run_sim(sd):
-        env = Sim(rout_mat=routing_matrix,
-                  arr_rate=arrival_rates,
-                  horizon=horizon_,
-                  trip_time=trip_mean_time,
-                  init_veh=initial_vehicle,
-                  time_per_step=time_per_step_,
-                  seed=sd)
+        env = SimpleSim(rout_mat=routing_matrix,
+                        arr_rate=arrival_rates,
+                        horizon=horizon_,
+                        trip_time=trip_mean_time,
+                        init_veh=initial_vehicle,
+                        time_per_step=time_per_step_,
+                        seed=sd)
         record = list()
         timestamp = []
         obs = env.reset()
