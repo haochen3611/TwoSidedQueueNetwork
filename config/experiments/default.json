@@ -1,6 +1,6 @@
 {
     "env_config": {
-        "rout_mat": [[0, 1], [1, 0]],
+        "rout_mat": 2,
         "arr_rate": [0.1, 0.1],
         "trip_time": [[100, 500], [500, 100]],
         "init_veh": [100, 100],

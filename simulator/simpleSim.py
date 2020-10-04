@@ -32,8 +32,8 @@ class SimpleSim:
         self.trip_time = trip_time
         self.init_veh = init_veh
         self._rng = np.random.default_rng(seed)
-        # self.arrival_func = arrival_func
-        # self.trip_func = trip_func
+
+        self._validate_input_arrays()
 
         self._curr_time = None
         self.veh_sched = None
@@ -46,6 +46,20 @@ class SimpleSim:
         self._serviced_per_step = None
         self._arrival_per_step = None
         self._step_true_span = None
+
+    def _validate_input_arrays(self):
+        """Use after variables are set. Check dimension coherence."""
+        assert isinstance(self.rout_mat, np.ndarray)
+        assert self.rout_mat.shape == (self.num_nodes, self.num_nodes)
+
+        assert isinstance(self.arr_rate, np.ndarray)
+        assert self.arr_rate.shape == (self.num_nodes, )
+
+        assert isinstance(self.trip_time, np.ndarray)
+        assert self.trip_time.shape == (self.num_nodes, self.num_nodes)
+
+        assert isinstance(self.init_veh, np.ndarray)
+        assert self.init_veh.shape == (self.num_nodes, )
 
     @property
     def queue_len(self):

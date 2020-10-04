@@ -6,4 +6,5 @@ python3 "${FILE_DIR}/run.py" \
   --num_cpus 2 \
   --num_gpus 1 \
   --iter 10 \
-  --config "${FILE_DIR}/config/experiments/default.json"
+  --debug \
+  --config "default.json"

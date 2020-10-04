@@ -1,7 +1,8 @@
 import json
 from abc import ABC
+import os
 import copy
-from simulator import SimpleSim
+from simulator import SimpleSim, generate_random_routing
 import numpy as np
 import gym
 import ray.rllib.agents.ppo as ppo
@@ -9,6 +10,7 @@ import ray
 from ray.tune.logger import pretty_print
 import argparse as ap
 from ray.rllib.utils import try_import_tf
+import warnings
 
 try:
     _, tf, version = try_import_tf(True)
@@ -27,12 +29,16 @@ __all__ = [
     'PPOExpRunner'
 ]
 
-NP_ARRAY_FIELDS = [
-    "rout_mat",
-    "arr_rate",
-    "trip_time",
-    "init_veh"
-]
+DEFAULT_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                                  os.path.pardir,
+                                                  "config", "experiments"))
+
+NP_ARRAY_FIELDS = {
+    "rout_mat": 2,  # number means dimensions
+    "arr_rate": 1,
+    "trip_time": 2,
+    "init_veh": 1
+}
 
 PPOENV_DEFAULT_CONFIG = {
     "rout_mat": np.array([[0, 1], [1, 0]]),
@@ -108,13 +114,16 @@ class PPOEnv(gym.Env, ABC):
 
 
 def config_file_parser(file_name):
-    config_ = {}
+
+    default_file_path = os.path.join(DEFAULT_CONFIG_DIR, file_name)
+    if os.path.isfile(default_file_path):
+        file_name = default_file_path
     try:
         with open(file_name, 'r') as f:
             config_ = json.load(f)
 
     except FileNotFoundError:
-        env_config_ = copy.deepcopy(PPOENV_DEFAULT_CONFIG)
+        raise FileNotFoundError(f'File \'{file_name}\' not found, fallback to default config')
 
     else:
         env_config_ = config_.pop('env_config', None)
@@ -122,15 +131,47 @@ def config_file_parser(file_name):
             for def_env_key in PPOENV_DEFAULT_CONFIG:
                 if def_env_key not in env_config_:
                     env_config_[def_env_key] = PPOENV_DEFAULT_CONFIG[def_env_key]
-                else:
-                    if def_env_key in NP_ARRAY_FIELDS:
-                        env_config_[def_env_key] = np.array(env_config_[def_env_key])
+
+            for def_env_key in PPOENV_DEFAULT_CONFIG:
+                if def_env_key in NP_ARRAY_FIELDS:
+                    if isinstance(env_config_[def_env_key], (int, str)):
+                        env_config_[def_env_key] = generate_random_routing(int(env_config_[def_env_key]),
+                                                                           int(env_config_['seed']))
+                    env_config_[def_env_key] = _validate_np_array_fields(env_config_[def_env_key],
+                                                                         def_env_key)
         else:
             env_config_ = copy.deepcopy(PPOENV_DEFAULT_CONFIG)
 
-    config_['env_config'] = env_config_
+        config_['env_config'] = env_config_
 
     return config_
+
+
+def _validate_np_array_fields(array_, field_):
+    """
+    Convert any array to np.ndarray with format checking
+    :param array_:
+    :param field_:
+    :return:
+    """
+    num_set_ = set('buifc')
+
+    if field_ in NP_ARRAY_FIELDS:
+        np_array_ = np.array(array_)
+        dim_ = np_array_.ndim
+        if dim_ != NP_ARRAY_FIELDS[field_]:
+            raise TypeError(f"\'{field_}\' should have {NP_ARRAY_FIELDS[field_]} dimensions, got {dim_}")
+        else:
+            if dim_ == 2:
+                shape_ = np_array_.shape
+                assert shape_[0] == shape_[1], f"\'{field_}\' should be square matrix, got {shape_}"
+            assert np_array_.dtype.kind in num_set_, f"\'{field_}\' should be numerical, got {np_array_.dtype}"
+        return np_array_
+    else:
+        try:
+            return PPOENV_DEFAULT_CONFIG[field_]
+        except KeyError:
+            return array_
 
 
 class PPOExpRunner:
@@ -153,6 +194,13 @@ class PPOExpRunner:
     @property
     def policy(self):
         return self._trainer.get_policy()
+
+    @property
+    def routing_mat(self):
+        try:
+            return self._all_config['env_config']['rout_mat']
+        except KeyError:
+            return None
 
     def load_cli_args(self):
 
