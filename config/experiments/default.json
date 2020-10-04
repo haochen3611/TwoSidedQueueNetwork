@@ -1,0 +1,13 @@
+{
+    "env_config": {
+        "rout_mat": [[0, 1], [1, 0]],
+        "arr_rate": [0.1, 0.1],
+        "trip_time": [[100, 500], [500, 100]],
+        "init_veh": [100, 100],
+        "seed": 1010,
+        "horizon": 1000,
+        "time_per_step": 10,
+        "alpha": 1,
+        "binary_state": true
+}
+}

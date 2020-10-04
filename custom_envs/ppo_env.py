@@ -171,8 +171,8 @@ class PPOExpRunner:
         self._all_config = ppo.DEFAULT_CONFIG.copy()
         self._all_config.update(file_config)
 
-        self._all_config['num_workers'] = int(self._cli_args ['num_cpus'])
-        self._all_config['num_gpus'] = int(self._cli_args ['num_gpus'])
+        self._all_config['num_workers'] = int(self._cli_args['num_cpus'])
+        self._all_config['num_gpus'] = int(self._cli_args['num_gpus'])
         self._all_config['vf_clip_param'] = 1000
         self._all_config['env'] = PPOEnv
         self._all_config['log_level'] = "ERROR"
