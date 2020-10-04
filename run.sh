@@ -1,5 +1,5 @@
 #!/bin/bash
 
-FILE_DIR=$(readlink -f "$0")
+FILE_DIR=$(dirname "$0")
 
-python3 "$FILE_DIR" --num_cpus 2 --num_gpus 1 --iter 10
+python3 "${FILE_DIR}/run.py" --num_cpus 2 --num_gpus 1 --iter 10
