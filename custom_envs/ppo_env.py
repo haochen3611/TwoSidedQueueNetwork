@@ -184,11 +184,13 @@ class PPOExpRunner:
 
         if not self._cli_args['debug']:
             try:
-                print("Running in cluster!")
                 ray.init(address='auto')
             except ConnectionError:
-                print("Running in single node!")
                 ray.init()
+                print("Running in single node!")
+            else:
+                print("Running in cluster!")
+
         else:
             ray.init(local_mode=True)
 
