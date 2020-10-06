@@ -13,9 +13,9 @@ runner = PPOExpRunner()
 runner.load_cli_args()
 print(runner.rout_mat)
 
-# runner.run()
-runner.run(dry_run=True,
-           checkpoint="/home/haochen/ray_results/PPO_PPOEnv_2020-10-05_17-58-10ntcdyccu/checkpoint_100/checkpoint-100")
+runner.run()
+# runner.run(dry_run=True,
+#            checkpoint="/home/haochen/ray_results/PPO_PPOEnv_2020-10-05_17-58-10ntcdyccu/checkpoint_100/checkpoint-100")
 trainer = runner.trainer
 config = runner.env_config
 config.pop('seed', None)
