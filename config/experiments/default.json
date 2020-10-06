@@ -7,7 +7,7 @@
                       [400, 500, 200]],
         "init_veh": [100, 100, 100],
         "seed": 1010,
-        "horizon": 100000,
+        "horizon": 1000000,
         "time_per_step": 10,
         "alpha": 1,
         "binary_state": true
