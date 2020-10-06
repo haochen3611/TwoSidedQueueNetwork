@@ -26,7 +26,8 @@ if not tf.test.is_built_with_cuda():
 __all__ = [
     'PPOEnv',
     'PPOENV_DEFAULT_CONFIG',
-    'PPOExpRunner'
+    'PPOExpRunner',
+    'binary_state_converter'
 ]
 
 DEFAULT_CONFIG_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__),
@@ -53,13 +54,13 @@ PPOENV_DEFAULT_CONFIG = {
 }
 
 
-def _state_converter(state):
+def binary_state_converter(state):
     return np.greater_equal(state, 0).astype(np.int8)
 
 
 class PPOEnv(gym.Env, ABC):
 
-    def __init__(self, config: dict):
+    def __init__(self, config: dict, **kwargs):
         self.trade_off_ratio = config.pop('alpha', 1.)
         self.binary_state = config.pop('binary_state', True)
         self.max_pass_len = config.pop('max_pass_len', 1000)
@@ -75,7 +76,7 @@ class PPOEnv(gym.Env, ABC):
 
     def reset(self):
         queue_len = self.sim.reset()
-        state = _state_converter(queue_len) if self.binary_state else queue_len
+        state = binary_state_converter(queue_len) if self.binary_state else queue_len
 
         return state
 
@@ -84,7 +85,7 @@ class PPOEnv(gym.Env, ABC):
 
         queue_len, terminate = self.sim.step(virtual_arr)
         reward = self._reward(queue_len, virtual_arr)
-        state = _state_converter(queue_len) if self.binary_state else queue_len
+        state = binary_state_converter(queue_len) if self.binary_state else queue_len
 
         # print(f"state: {self.sim.queue_len}, action: {virtual_arr}, reward: {reward}")
 
@@ -182,13 +183,18 @@ class PPOExpRunner:
         self._all_config = None
         self._iterations = None
         self._trainer = None
+        self._checkpoint_path = None
 
         if eager:
             self.load_cli_args()
             self.run(checkpoint=checkpoint)
 
     @property
-    def trainer(self):
+    def result_folder(self):
+        return os.path.realpath(os.path.join(self._checkpoint_path, ".."))
+
+    @property
+    def trainer(self) -> ppo.PPOTrainer:
         return self._trainer
 
     @property
@@ -196,9 +202,16 @@ class PPOExpRunner:
         return self._trainer.get_policy()
 
     @property
-    def routing_mat(self):
+    def rout_mat(self):
         try:
-            return self._all_config['env_config']['rout_mat']
+            return copy.deepcopy(self._all_config['env_config']['rout_mat'])
+        except KeyError:
+            return None
+
+    @property
+    def env_config(self):
+        try:
+            return copy.deepcopy(self._all_config['env_config'])
         except KeyError:
             return None
 
@@ -225,7 +238,7 @@ class PPOExpRunner:
         self._all_config['env'] = PPOEnv
         self._all_config['log_level'] = "ERROR"
 
-    def run(self, checkpoint=None):
+    def run(self, checkpoint=None, iters=None, dry_run=False):
 
         if self._cli_args is None:
             self.load_cli_args()
@@ -246,12 +259,14 @@ class PPOExpRunner:
         if checkpoint is not None:
             self._trainer.restore(checkpoint)
 
-        for _ in range(self._iterations):
-            res = self._trainer.train()
-            if (_ + 1) % 10 == 0:
-                print(pretty_print(res))
-            if (_ + 1) % 100 == 0:
-                print(f"Model saved at {self._trainer.save()}")
+        if not dry_run:
+            for _ in range(self._iterations if iters is None else int(iters)):
+                res = self._trainer.train()
+                if (_ + 1) % 10 == 0:
+                    print(pretty_print(res))
+                if (_ + 1) % 100 == 0:
+                    self._checkpoint_path = self._trainer.save()
+                    print(f"Model saved at {self._checkpoint_path}")
 
 
 if __name__ == '__main__':

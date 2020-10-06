@@ -3,8 +3,7 @@
 FILE_DIR=$(dirname "$0")
 
 python3 "${FILE_DIR}/run.py" \
-  --num_cpus 2 \
-  --num_gpus 1 \
-  --iter 10 \
-  --debug \
+  --num_cpus 100 \
+  --num_gpus 0 \
+  --iter 100 \
   --config "default.json"

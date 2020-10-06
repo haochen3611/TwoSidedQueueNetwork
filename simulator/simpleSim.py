@@ -21,7 +21,8 @@ class SimpleSim:
                  init_veh,
                  horizon,
                  time_per_step,
-                 seed):
+                 seed,
+                 **kwargs):
 
         self.rout_mat = rout_mat
         self.arr_rate = arr_rate
@@ -34,6 +35,8 @@ class SimpleSim:
         self._rng = np.random.default_rng(seed)
 
         self._validate_input_arrays()
+
+        self._action_shape = (self.num_nodes, self.num_nodes)
 
         self._curr_time = None
         self.veh_sched = None
@@ -63,7 +66,7 @@ class SimpleSim:
 
     @property
     def queue_len(self):
-        return self._queue_state
+        return np.array(self._queue_state)
 
     @property
     def vehicle_on_road(self):
@@ -109,7 +112,7 @@ class SimpleSim:
         for _ in range(self.num_nodes):
             self._pass_queue[_] = deque()
 
-        return self._queue_state
+        return self.queue_len
 
     def travel_time(self, start, end):
         """
@@ -151,6 +154,7 @@ class SimpleSim:
         :param virtual_arr: (num_nodes, num_nodes) virtual passenger arrival
         :return:
         """
+
         virt_arr_od = np.zeros(self.num_nodes, self.num_nodes) if virtual_arr is None else virtual_arr
         true_arr_od = self.arr_rate.reshape((-1, 1)) * self.rout_mat
         if od_pair is None:
@@ -160,6 +164,11 @@ class SimpleSim:
             self._gen_pass(true_arr_od, virt_arr_od, od_pair)
 
     def next_event(self, action: np.ndarray):
+        """
+
+        :param action: np.ndarray (num_nodes, num_nodes)
+        :return:
+        """
         if len(self.pass_sched) == 0:
             self.pass_arr(action)
 
@@ -198,20 +207,23 @@ class SimpleSim:
 
             self._queue_state[cur_arr_veh[2]] -= 1
 
-        return self._queue_state
+        return self.queue_len
 
     def step(self, action, t=None):
         """
         Time-based execution. Soft requirement for step interval c To accommodate RL controller.
         :param t: time span for each step
         :param action: virtual passenger arrival, same dim as arrival rate
+        (num_nodes, num_nodes) or (num_nodes*num_nodes, )
         :return: None if time goes over horizon
         """
+        if action.shape != self._action_shape:
+            action = np.reshape(action, self._action_shape)
 
         t = self.time_per_step if t is None else float(t)
         now = self._curr_time
-        pre_arr = self._total_pass
-        pre_ser = self._serviced_pass
+        pre_arr = np.array(self._total_pass)
+        pre_ser = np.array(self._serviced_pass)
         while self._curr_time < t + now:
             self.next_event(action)
 
@@ -220,7 +232,7 @@ class SimpleSim:
         self._arrival_per_step = self._total_pass - pre_arr
         self._serviced_per_step = self._serviced_pass - pre_ser
 
-        return self._queue_state, self._curr_time >= self.horizon
+        return self.queue_len, self._curr_time >= self.horizon
 
 
 def simple_policy(state: np.ndarray, pass_arr_rate: np.ndarray, routing_mat: np.ndarray):
@@ -243,6 +255,7 @@ def simple_policy(state: np.ndarray, pass_arr_rate: np.ndarray, routing_mat: np.
 def generate_random_routing(num_nodes, seed=1):
     rng = np.random.default_rng(seed)
     rt_mat = rng.uniform(0, 1, (num_nodes, num_nodes))
+    np.fill_diagonal(rt_mat, 0)
     return rt_mat / rt_mat.sum(axis=1).reshape((-1, 1))
 
 
@@ -252,16 +265,20 @@ if __name__ == '__main__':
     import warnings
     np.set_printoptions(precision=3, suppress=True)
 
-    num_stations = 2
-    # routing_matrix = generate_random_routing(num_stations)
-    routing_matrix = np.array([[0, 1], [1, 0]])
-    horizon_ = 50000
-    arrival_rates = np.array([0.1, 0.1])  # expected passenger arrival rate count/sec
-    trip_mean_time = np.array([[100, 500], [500, 100]])  # expected trip time
-    initial_vehicle = np.array([100, 100])
+    # num_stations = 3
+    # routing_matrix = generate_random_routing(num_stations, 1515151)
+    routing_matrix = np.array([[0, 0.5, 0.5],
+                               [0.5, 0, 0.5],
+                               [0.5, 0.5, 0]])
+    horizon_ = 1000000
+    arrival_rates = np.array([0.1, 0.1, 0.1])  # expected passenger arrival rate count/sec
+    trip_mean_time = np.array([[100, 100, 100],
+                               [100, 100, 100],
+                               [100, 100, 100]])  # expected trip time
+    initial_vehicle = np.array([100, 100, 100])
     time_per_step_ = 10
-    # seeds = [*range(100)]
-    seeds = [0]
+    seeds = [*range(100)]
+    # seeds = [0]
 
     def run_sim(sd):
         env = SimpleSim(rout_mat=routing_matrix,
@@ -278,10 +295,14 @@ if __name__ == '__main__':
         timestamp.append(env.time)
         first_enter = None
         while True:
-            act = simple_policy(obs, arrival_rates, routing_matrix)
-            # act = np.zeros(obs.shape, ob.shape)
-            print(f"Time: {env.time: .2f} State: {obs} Action: {act} On road: {env.vehicle_on_road} "
-                  f"Total pass: {env.total_arr}")
+            # act = simple_policy(obs, arrival_rates, routing_matrix)
+            act = np.zeros(routing_matrix.shape)
+            # print("####################################################")
+            # print(f"Time: {env.time: .2f}\n"
+            #       f"State: {obs}\n"
+            #       f"Action: {act}\n"
+            #       f"On road: {env.vehicle_on_road}\n"
+            #       f"Total pass: {env.total_arr}")
             # obs = env.next_event(act)
             obs, term = env.step(act, t=time_per_step_)
 
@@ -303,21 +324,22 @@ if __name__ == '__main__':
         timestamp = np.array(timestamp)
 
         plt.plot(timestamp, record)
-        plt.legend(['0', '1'])
+        plt.legend([str(x) for x in range(arrival_rates.shape[0])])
         plt.title('Imbalance vs time')
         plt.xlabel('Time')
         plt.ylabel('Imbalance')
         plt.grid()
         plt.savefig(f'plots/seed_{sd}.png')
         plt.close("all")
-        print(f'Exp: {sd} Arr: {env.total_eff_arr_rate: .3f} Throughput: {env.total_throughput}')
-        print(f'Routing Matrix:\n {routing_matrix}')
+        # print("################################################")
+        print(f'Exp: {sd}\nArr: {env.total_eff_arr_rate: .3f}\nThroughput: {env.total_throughput}')
+        # print(f'Routing Matrix:\n {routing_matrix}')
 
 
-    # with mp.Pool(12) as pool:
-    #     pool.map(run_sim, seeds)
-
-    for _ in seeds:
-        run_sim(_)
+    with mp.Pool(12) as pool:
+        pool.map(run_sim, seeds)
+    #
+    # for _ in seeds:
+    #     run_sim(_)
 
     # run_sim(*seeds)

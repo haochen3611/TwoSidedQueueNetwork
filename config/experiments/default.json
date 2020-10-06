@@ -1,11 +1,13 @@
 {
     "env_config": {
-        "rout_mat": 2,
-        "arr_rate": [0.1, 0.1],
-        "trip_time": [[100, 500], [500, 100]],
-        "init_veh": [100, 100],
+        "rout_mat": 3,
+        "arr_rate": [0.2, 0.1, 0.3],
+        "trip_time": [[100, 500, 100],
+                      [500, 100, 500],
+                      [400, 500, 200]],
+        "init_veh": [100, 100, 100],
         "seed": 1010,
-        "horizon": 1000,
+        "horizon": 100000,
         "time_per_step": 10,
         "alpha": 1,
         "binary_state": true
