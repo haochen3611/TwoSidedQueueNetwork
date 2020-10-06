@@ -6,6 +6,7 @@ from simulator import SimpleSim, generate_random_routing
 import numpy as np
 import gym
 import ray.rllib.agents.ppo as ppo
+import ray.rllib.agents.impala as impala
 import ray
 from ray.tune.logger import pretty_print
 import argparse as ap
@@ -194,7 +195,7 @@ class PPOExpRunner:
         return os.path.realpath(os.path.join(self._checkpoint_path, ".."))
 
     @property
-    def trainer(self) -> ppo.PPOTrainer:
+    def trainer(self) -> ppo.APPOTrainer:
         return self._trainer
 
     @property
@@ -229,12 +230,12 @@ class PPOExpRunner:
         self._iterations = self._cli_args['iter']
         file_config = config_file_parser(self._cli_args['config'])
 
-        self._all_config = ppo.DEFAULT_CONFIG.copy()
+        self._all_config = impala.DEFAULT_CONFIG.copy()
         self._all_config.update(file_config)
 
         self._all_config['num_workers'] = int(self._cli_args['num_cpus'])
         self._all_config['num_gpus'] = int(self._cli_args['num_gpus'])
-        self._all_config['vf_clip_param'] = 1000
+        # self._all_config['vf_clip_param'] = 1000
         self._all_config['env'] = PPOEnv
         self._all_config['log_level'] = "ERROR"
 
@@ -255,7 +256,7 @@ class PPOExpRunner:
         else:
             ray.init(local_mode=True)
 
-        self._trainer = ppo.PPOTrainer(config=self._all_config)
+        self._trainer = ppo.APPOTrainer(config=self._all_config)
         if checkpoint is not None:
             self._trainer.restore(checkpoint)
 
