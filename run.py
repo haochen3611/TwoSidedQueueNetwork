@@ -15,10 +15,11 @@ print(runner.rout_mat)
 
 runner.run()
 # runner.run(dry_run=True,
-#            checkpoint="/home/haochen/ray_results/PPO_PPOEnv_2020-10-05_17-58-10ntcdyccu/checkpoint_100/checkpoint-100")
+#            checkpoint="/home/haochen/ray_results/PPO_PPOEnv_2020-10-07_00-49-03dqt4w37x/checkpoint_100/checkpoint-100")
 trainer = runner.trainer
 config = runner.env_config
 config.pop('seed', None)
+config["horizon"] = 1000000
 # seeds = [*range(100)]
 seeds = [20]
 
@@ -69,7 +70,7 @@ def run_sim(sd):
     plt.xlabel('Time')
     plt.ylabel('Imbalance')
     plt.grid()
-    plt.savefig(f'plots/rl_trained/seed_{sd}.png')
+    plt.savefig(os.path.join(os.path.realpath(__file__), f'plots/rl_trained/seed_{sd}.png'))
     plt.close("all")
     # print("################################################")
     print(f'Exp: {sd}\nArr: {env.total_eff_arr_rate: .3f}\nThroughput: {env.total_throughput}')

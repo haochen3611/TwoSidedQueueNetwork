@@ -110,9 +110,10 @@ class PPOEnv(gym.Env, ABC):
     def _reward(self, state, virt_arr):
         # arr = np.sum(self.sim.per_step_arrival)
         ser = np.sum(self.sim.per_step_throughput)
-        service_rate = ser
+        arr = np.sum(self.sim.per_step_arrival)
+        net_throughput = ser - arr
         reb_cost = np.sum(virt_arr * self.normalized_trip_time)
-        return service_rate - self.trade_off_ratio * reb_cost
+        return net_throughput - self.trade_off_ratio * reb_cost
 
 
 def config_file_parser(file_name):
